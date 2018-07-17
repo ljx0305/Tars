@@ -17,6 +17,7 @@
 package com.qq.tars.client.rpc.tars;
 
 import java.lang.reflect.Method;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -25,8 +26,15 @@ import com.qq.tars.client.cluster.ServantnvokerAliveChecker;
 import com.qq.tars.client.rpc.ServantClient;
 import com.qq.tars.client.rpc.ServantInvokeContext;
 import com.qq.tars.client.rpc.ServantInvoker;
+import com.qq.tars.common.Filter;
+import com.qq.tars.common.FilterChain;
+import com.qq.tars.common.FilterKind;
 import com.qq.tars.common.util.Constants;
+import com.qq.tars.common.util.DyeingSwitch;
+import com.qq.tars.context.DistributedContext;
+import com.qq.tars.context.DistributedContextManager;
 import com.qq.tars.net.client.Callback;
+import com.qq.tars.net.core.Request.InvokeStatus;
 import com.qq.tars.protocol.tars.support.TarsMethodInfo;
 import com.qq.tars.protocol.tars.support.TarsMethodParameterInfo;
 import com.qq.tars.protocol.util.TarsHelper;
@@ -37,12 +45,16 @@ import com.qq.tars.rpc.exc.TimeoutException;
 import com.qq.tars.rpc.protocol.tars.TarsServantRequest;
 import com.qq.tars.rpc.protocol.tars.TarsServantResponse;
 import com.qq.tars.rpc.protocol.tars.support.AnalystManager;
+import com.qq.tars.server.core.AppContextManager;
 import com.qq.tars.support.stat.InvokeStatHelper;
 
 public class TarsInvoker<T> extends ServantInvoker<T> {
+	
+	List<Filter> filters;
 
     public TarsInvoker(ServantProxyConfig config, Class<T> api, Url url, ServantClient[] clients) {
         super(config, api, url, clients);
+        filters = AppContextManager.getInstance().getAppContext() == null ? null : AppContextManager.getInstance().getAppContext().getFilters(FilterKind.CLIENT);
     }
 
     protected Object doInvokeServant(final ServantInvokeContext inv) throws Throwable {
@@ -95,7 +107,35 @@ public class TarsInvoker<T> extends ServantInvoker<T> {
         request.setMethodInfo(AnalystManager.getInstance().getMethodMap(objName).get(method));
         request.setMethodParameters(args);
         request.setContext(context);
-        return client.invokeWithSync(request);
+        request.setInvokeStatus(InvokeStatus.SYNC_CALL);
+        
+        TarsServantResponse response = new TarsServantResponse(request.getIoSession());
+        response.setRequest(request);
+        response.setRequestId(request.getTicketNumber());
+        response.setVersion(request.getVersion());
+        response.setPacketType(request.getPacketType());
+        response.setMessageType(request.getMessageType());
+        response.setStatus(request.getStatus());
+        response.setRequest(request);
+        response.setCharsetName(request.getCharsetName());
+        response.setTimeout(request.getTimeout());
+        response.setContext(request.getContext());
+        
+        DistributedContext distributedContext = DistributedContextManager.getDistributedContext();
+        Boolean bDyeing = distributedContext.get(DyeingSwitch.BDYEING);        
+        if (bDyeing != null && bDyeing == true) {
+        	request.setMessageType(request.getMessageType() | TarsHelper.MESSAGETYPEDYED);
+        	HashMap<String, String> status = new HashMap<String, String>();
+        	String routeKey = distributedContext.get(DyeingSwitch.DYEINGKEY);
+        	String fileName = distributedContext.get(DyeingSwitch.FILENAME);
+        	status.put(DyeingSwitch.STATUS_DYED_KEY, routeKey == null ? "" : routeKey);
+        	status.put(DyeingSwitch.STATUS_DYED_FILENAME, fileName == null ? "" : fileName);
+        	request.setStatus(status);
+        	
+        }
+        FilterChain filterChain = new TarsClientFilterChain(filters, objName, FilterKind.CLIENT, client, 0, null);
+        filterChain.doFilter(request, response);
+        return response;
     }
 
     @SuppressWarnings("unchecked")
@@ -112,6 +152,7 @@ public class TarsInvoker<T> extends ServantInvoker<T> {
         TarsMethodInfo methodInfo = AnalystManager.getInstance().getMethodMap(objName).get(method);
         request.setMethodInfo(methodInfo);
         request.setMethodParameters(args);
+        request.setInvokeStatus(InvokeStatus.ASYNC_CALL);
 
         Callback<TarsServantResponse> callback = null;
         List<TarsMethodParameterInfo> parameterInfoList = methodInfo.getParametersList();
@@ -125,7 +166,24 @@ public class TarsInvoker<T> extends ServantInvoker<T> {
         if (callback == null) {
             request.setPacketType(TarsHelper.ONEWAY);
         }
-        client.invokeWithAsync(request, new TarsCallbackWrapper(config, request.getFunctionName(), getUrl().getHost(), getUrl().getPort(), request.getBornTime(), callback));
+        
+        TarsServantResponse response = new TarsServantResponse(client.getIoSession());
+        
+        DistributedContext distributedContext = DistributedContextManager.getDistributedContext();
+        Boolean bDyeing = distributedContext.get(DyeingSwitch.BDYEING);        
+        if (bDyeing != null && bDyeing == true) {
+        	request.setMessageType(request.getMessageType() | TarsHelper.MESSAGETYPEDYED);
+        	HashMap<String, String> status = new HashMap<String, String>();
+        	String routeKey = distributedContext.get(DyeingSwitch.DYEINGKEY);
+        	String fileName = distributedContext.get(DyeingSwitch.FILENAME);
+        	status.put(DyeingSwitch.STATUS_DYED_KEY, routeKey == null ? "" : routeKey);
+        	status.put(DyeingSwitch.STATUS_DYED_FILENAME, fileName == null ? "" : fileName);
+        	request.setStatus(status);
+        	
+        }
+        FilterChain filterChain = new TarsClientFilterChain(filters, objName, FilterKind.CLIENT, client, 1, 
+        		new TarsCallbackWrapper(config, request.getFunctionName(), getUrl().getHost(), getUrl().getPort(), request.getBornTime(), request, callback));
+        filterChain.doFilter(request, response);
     }
 
     private boolean isHashInvoke(Map<String, String> context) {

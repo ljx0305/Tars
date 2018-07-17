@@ -18,6 +18,7 @@ package com.qq.tars.server.config;
 
 import java.io.IOException;
 
+import com.qq.tars.client.CommunicatorConfig;
 import com.qq.tars.common.util.Config;
 import com.qq.tars.common.util.StringUtils;
 
@@ -27,12 +28,31 @@ public class ConfigurationManager {
 
     private volatile ServerConfig serverConfig;
 
+    private volatile CommunicatorConfig communicatorConfig;
+
     public static ConfigurationManager getInstance() {
         return instance;
     }
 
+    @Deprecated
     public ServerConfig getserverConfig() {
         return serverConfig;
+    }
+
+    public ServerConfig getServerConfig() {
+        return serverConfig;
+    }
+
+    public void setServerConfig(ServerConfig config) {
+        this.serverConfig = config;
+    }
+
+    public CommunicatorConfig getCommunicatorConfig() {
+        return communicatorConfig;
+    }
+
+    public void setCommunicatorConfig(CommunicatorConfig communicatorConfig) {
+        this.communicatorConfig = communicatorConfig;
     }
 
     public void init() throws ConfigurationException {
@@ -85,6 +105,7 @@ public class ConfigurationManager {
                 throw new ConfigurationException("invalid config");
             }
             this.serverConfig = cfg;
+            this.communicatorConfig = cfg.getCommunicatorConfig();
         } catch (IOException ioe) {
             throw new ConfigurationException("read config file error.", ioe);
         } catch (Exception e) {

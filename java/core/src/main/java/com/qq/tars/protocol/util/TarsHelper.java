@@ -40,6 +40,7 @@ import com.qq.tars.protocol.tars.annotation.TarsContext;
 import com.qq.tars.protocol.tars.annotation.TarsHolder;
 import com.qq.tars.protocol.tars.annotation.TarsMethod;
 import com.qq.tars.protocol.tars.annotation.TarsMethodParameter;
+import com.qq.tars.protocol.tars.annotation.TarsRouteKey;
 import com.qq.tars.protocol.tars.annotation.TarsStruct;
 import com.qq.tars.protocol.tars.annotation.TarsStructProperty;
 import com.qq.tars.protocol.tars.support.TarsMethodInfo;
@@ -189,6 +190,9 @@ public class TarsHelper {
             if (annotation.annotationType() == TarsMethodParameter.class) {
                 TarsMethodParameter parameter = (TarsMethodParameter) annotation;
                 return parameter.name();
+            } else if (annotation.annotationType() == TarsHolder.class) {
+                TarsHolder tarsHolder = (TarsHolder) annotation;
+                return tarsHolder.name();
             }
         }
         return null;
@@ -200,7 +204,8 @@ public class TarsHelper {
             if (CommonUtils.isJavaBase(clazz) || clazz.isArray() || isStruct(clazz)) {
                 return getJavaBaseOrArrayOrJavaBeanStamp((Class<?>) type);
             } else {
-                throw new RuntimeException("the class: " + clazz + " not a exact class, please check it.");
+                return clazz;
+//                throw new RuntimeException("the class: " + clazz + " not a exact class, please check it.");
             }
         } else if (type instanceof ParameterizedType) {
             ParameterizedType parameterizedType = (ParameterizedType) type;
@@ -365,6 +370,10 @@ public class TarsHelper {
                 if (!isCallback(allParameterAnnotations[order])) {
                     parameterInfo.setStamp(TarsHelper.getParameterStamp(genericParameterType));
                 }
+                
+                if (isRoutekey(allParameterAnnotations[order])) {
+                	methodInfo.setRouteKeyIndex(order);
+                }
             } catch (Exception e) {
                 throw new RuntimeException("failed to create parameter info:" + method + ", index=[" + order + "]", e);
             }
@@ -446,6 +455,18 @@ public class TarsHelper {
             }
         }
         return false;
+    }
+    
+    public static boolean isRoutekey(Annotation[] annotations) {
+    	if (annotations == null || annotations.length < 0) {
+    		return false;
+    	}
+    	for (Annotation annotation : annotations) {
+    		if (annotation.annotationType() ==TarsRouteKey.class) {
+    			return true;
+    		}
+    	}
+    	return false;
     }
 
     public static boolean isStruct(Class<?> clazz) {

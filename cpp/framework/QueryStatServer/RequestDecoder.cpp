@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Tencent is pleased to support the open source community by making Tars available.
  *
  * Copyright (C) 2016THL A29 Limited, a Tencent company. All rights reserved.
@@ -428,6 +428,10 @@ int RequestDecoder::decode()
 {
     
      _req.Parse(_input.c_str());
+	 if (_req.HasParseError()) {
+		 TLOGERROR("Decode error:"<<_req.GetParseError()<<"|"<<_input);
+		 return -1;
+	 }
 
     try
     {

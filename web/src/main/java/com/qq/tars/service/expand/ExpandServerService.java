@@ -199,8 +199,12 @@ public class ExpandServerService {
                 adapter.setQueuecap(sourceAdapter.getQueuecap());
                 adapter.setQueuetimeout(sourceAdapter.getQueuetimeout());
 
-                adapter.setEndpoint(String.format("tcp -h %s -t %s -p %s",
-                        preserver.getBindIp(), sourceAdapter.getQueuetimeout(), preserver.getPort()));
+                adapter.setAllowIp(sourceAdapter.getAllowIp());
+                adapter.setProtocol(sourceAdapter.getProtocol());
+                adapter.setHandlegroup(sourceAdapter.getHandlegroup());
+
+                adapter.setEndpoint(String.format("tcp -h %s -t %s -p %s -e %s",
+                        preserver.getBindIp(), sourceAdapter.getQueuetimeout(), preserver.getPort(), preserver.getAuth()));
 
                 adapterMapper.insertAdapterConf(adapter);
             }

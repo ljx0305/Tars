@@ -162,7 +162,7 @@ bool TC_URL::parseURL(const string &sURL)
     string::size_type nNumbersignIndex = originRequest.find("#", iPos);
 
 
-    string    sUrlAuthority;
+    string  sUrlAuthority;
     string  sUrlPath;
 
       if(nQuestionIndex < index)
@@ -201,7 +201,7 @@ bool TC_URL::parseURL(const string &sURL)
     index = sUrlAuthority.find("@");
     if(index != string::npos)
     {
-        _sUser        = sUrlAuthority.substr(0, index);
+        _sUser      = sUrlAuthority.substr(0, index);
         _sDomain    = sUrlAuthority.substr(index + 1);
     }
     else
@@ -246,14 +246,14 @@ bool TC_URL::parseURL(const string &sURL)
     }
     else
     {
-        _sPath        = sUrlPath;
-        _sQuery        = "";
+        _sPath  = sUrlPath;
+        _sQuery = "";
 
         index = _sPath.rfind("#");
         if(index != string::npos)
         {
-            _sRef        = _sPath.substr(index + 1);
-            _sPath        = _sPath.substr(0, index);
+            _sRef   = _sPath.substr(index + 1);
+            _sPath  = _sPath.substr(0, index);
         }
     }
 
@@ -550,17 +550,6 @@ size_t TC_Http::getContentLength() const
 
 string TC_Http::genHeader() const
 {
-    /*ostringstream sHttpHeader;
-
-    for(http_header_type::const_iterator it = _headers.begin(); it != _headers.end(); ++it)
-    {
-        if(it->second != "")
-        {
-            sHttpHeader << it->first << ": " << it->second << "\r\n";
-        }
-    }
-
-    return sHttpHeader.str();*/
     string sHttpHeader;
 
     for(http_header_type::const_iterator it = _headers.begin(); it != _headers.end(); ++it)
@@ -684,8 +673,11 @@ const char* TC_Http::parseHeader(const char* szBuffer, http_header_type &sHeader
         //如果是第一行, 则忽略掉
         if(strncasecmp(sLine.c_str(), "GET ", 4) ==0
            || strncasecmp(sLine.c_str(), "POST ", 5) ==0
+           || strncasecmp(sLine.c_str(), "PUT ", 4) ==0
+           || strncasecmp(sLine.c_str(), "PATCH ", 6) ==0
            || strncasecmp(sLine.c_str(), "OPTIONS ", 8) ==0
            || strncasecmp(sLine.c_str(), "HEAD ", 5) ==0
+           || strncasecmp(sLine.c_str(), "DELETE ", 7) ==0
            || strncasecmp(sLine.c_str(), "HTTP/", 5) ==0)
         {
             continue;
@@ -1287,11 +1279,13 @@ bool TC_HttpResponse::incrementDecode(string &sBuffer)
     {
         if(_iTmpContentLength == 0)
         {
+#if 0
             _content += sBuffer;
             sBuffer   = "";
 
             //自动填写content-length
             setContentLength(getContent().length());
+#endif
 
             return true;
         }
@@ -1303,19 +1297,21 @@ bool TC_HttpResponse::incrementDecode(string &sBuffer)
                 return true;
             }
 
+#if 0
             _content += sBuffer;
             sBuffer   = "";
 
             //自动填写content-length
             setContentLength(getContent().length());
+#endif
 
             return false;
         }
         else
         {
-            //短连接模式, 接收到长度大于头部为止
-            _content += sBuffer;
-            sBuffer   = "";
+            std::string body = sBuffer.substr(0, _iTmpContentLength);
+            _content += body;
+            sBuffer.erase(0, _iTmpContentLength);
 
             size_t iNowLength = getContent().length();
 
@@ -1373,14 +1369,6 @@ bool TC_HttpResponse::decode(const char *sBuffer, size_t iLength)
 
 string TC_HttpResponse::encode() const
 {
-    /*ostringstream os;
-    os << _version << " " << _status << " " << _about << "\r\n";
-    os << genHeader();
-    os <<  "\r\n";
-
-    os << _content;
-
-    return os.str();*/
     string sRet;
     sRet += _version;
     sRet += " ";
@@ -1496,8 +1484,11 @@ string TC_HttpRequest::requestType2str(int iRequestType) const
     {
         return "DELETE";
     }
+    else if(iRequestType == REQUEST_PATCH)
+    {
+        return "PATCH";
+    }
 
-    assert(true);
     return "";
 }
 
@@ -1537,6 +1528,25 @@ void TC_HttpRequest::encode(int iRequestType, ostream &os)
     os << requestType2str(iRequestType) << " " << _httpURL.getRequest() << " HTTP/1.1\r\n";
     os << genHeader();
     os << "\r\n";
+}
+
+void TC_HttpRequest::setRequest(const string& method, const string &sUrl, const std::string& body, bool bNewCreateHost)
+{
+    std::string lowMethod(method);
+    std::transform(method.begin(), method.end(), lowMethod.begin(), ::tolower);
+
+    if (lowMethod == "get")
+        setGetRequest(sUrl, bNewCreateHost);
+    else if (lowMethod == "head")
+        setHeadRequest(sUrl, bNewCreateHost);
+    else if (lowMethod == "post")
+        setPostRequest(sUrl, body, bNewCreateHost);
+    else if (lowMethod == "put")
+        setPutRequest(sUrl, body, bNewCreateHost);
+    else if (lowMethod == "delete")
+        setDeleteRequest(sUrl, body, bNewCreateHost);
+    else if (lowMethod == "patch")
+        setPatchRequest(sUrl, body, bNewCreateHost);
 }
 
 void TC_HttpRequest::setGetRequest(const string &sUrl, bool bNewCreateHost)
@@ -1602,6 +1612,23 @@ void TC_HttpRequest::setPutRequest(const string &sUrl, const string &sPostBody, 
 
     setHeader("Content-Length", TC_Common::tostr(_content.length()));
 }
+
+void TC_HttpRequest::setPatchRequest(const string &sUrl, const string &sPostBody, bool bNewCreateHost )
+{
+    if(bNewCreateHost)
+    {
+        eraseHeader("Host");
+    }
+
+    parseURL(sUrl);
+
+    _requestType    = REQUEST_PATCH;
+
+    _content        = sPostBody;
+
+    setHeader("Content-Length", TC_Common::tostr(_content.length()));
+}
+
 
 void TC_HttpRequest::setDeleteRequest(const string &sUrl, const string &sPostBody, bool bNewCreateHost )
 {
@@ -1726,10 +1753,9 @@ string TC_HttpRequest::encode()
         sRet += genHeader();
         sRet += "\r\n";
     }
-    else if(_requestType == REQUEST_PUT)
+    else if(_requestType == REQUEST_PUT || _requestType == REQUEST_PATCH)
     {
         setContentLength(_content.length());
-        //encode(REQUEST_GET, os);
         sRet += requestType2str(_requestType);
         sRet += " ";
         sRet += _httpURL.getRequest();
@@ -1756,8 +1782,6 @@ string TC_HttpRequest::encode()
 
 void TC_HttpRequest::encode(vector<char> &buffer)
 {
-//    assert(_requestType == REQUEST_GET || _requestType == REQUEST_POST || !_originRequest.empty());
-
     buffer.clear();
 
     string s = encode();
@@ -1774,7 +1798,14 @@ bool TC_HttpRequest::decode(const char *sBuffer, size_t iLength)
 {
     assert(sBuffer != NULL);
 
-    if(strncasecmp(sBuffer, "GET " ,4) !=0 && strncasecmp(sBuffer, "POST " ,5) !=0 && strncasecmp(sBuffer, "OPTIONS " ,8) !=0 && strncasecmp(sBuffer, "HEAD " ,5))
+    if(strncasecmp(sBuffer, "GET " ,4) !=0 &&
+       strncasecmp(sBuffer, "POST " ,5) !=0 &&
+       strncasecmp(sBuffer, "PUT " ,4) !=0 &&
+       strncasecmp(sBuffer, "PATCH " ,6) !=0 &&
+       strncasecmp(sBuffer, "OPTIONS " ,8) !=0 &&
+       strncasecmp(sBuffer, "PRI " , 4) !=0 &&
+       strncasecmp(sBuffer, "DELETE " , 7) !=0 &&
+       strncasecmp(sBuffer, "HEAD " ,5))
     {
         throw runtime_error("[TC_HttpRequest::checkRequest] protocol not support, only support GET HEAD POST and OPTIONS ");
     }
@@ -1833,9 +1864,16 @@ bool TC_HttpRequest::decode(const char *sBuffer, size_t iLength)
 
 bool TC_HttpRequest::checkRequest(const char* sBuffer, size_t iLen)
 {
-   if(strncasecmp(sBuffer, "GET " ,4) !=0 && strncasecmp(sBuffer, "POST " ,5) !=0 && strncasecmp(sBuffer, "OPTIONS " ,8) !=0 && strncasecmp(sBuffer, "HEAD " ,5) != 0)
+    if(strncasecmp(sBuffer, "GET " ,4) !=0 &&
+       strncasecmp(sBuffer, "POST " ,5) !=0 &&
+       strncasecmp(sBuffer, "PUT " ,4) !=0 &&
+       strncasecmp(sBuffer, "PATCH " ,6) !=0 &&
+       strncasecmp(sBuffer, "OPTIONS " ,8) !=0 &&
+       strncasecmp(sBuffer, "PRI " , 4) !=0 &&
+       strncasecmp(sBuffer, "DELETE " , 7) !=0 &&
+       strncasecmp(sBuffer, "HEAD " ,5))
    {
-       throw runtime_error("[TC_HttpRequest::checkRequest] protocol not support, only support GET HEAD POST and OPTIONS ");
+       throw runtime_error("[TC_HttpRequest::checkRequest] protocol not support, only support GET HEAD POST PUT PATCH DELETE and OPTIONS ");
    }
 
    const char *p = strstr(sBuffer, "\r\n\r\n");
@@ -1991,6 +2029,14 @@ size_t TC_HttpRequest::parseRequestHeader(const char* szBuffer)
     {
         _requestType = REQUEST_POST;
     }
+    else if(strncasecmp(sMethod.c_str(), "PUT", 3) ==0)
+    {
+        _requestType = REQUEST_PUT;
+    }
+    else if(strncasecmp(sMethod.c_str(), "PATCH", 5) ==0)
+    {
+        _requestType = REQUEST_PATCH;
+    }
     else if(strncasecmp(sMethod.c_str(), "OPTIONS", 7) ==0)    //else if(sMethod == "OPTIONS")
     {
         _requestType = REQUEST_OPTIONS;
@@ -1998,6 +2044,10 @@ size_t TC_HttpRequest::parseRequestHeader(const char* szBuffer)
     else if(strncasecmp(sMethod.c_str(), "HEAD", 4) == 0)
     {
          _requestType = REQUEST_HEAD;
+    }
+    else if(strncasecmp(sMethod.c_str(), "DELETE", 6) == 0)
+    {
+         _requestType = REQUEST_DELETE;
     }
     else
     {
@@ -2016,7 +2066,7 @@ size_t TC_HttpRequest::parseRequestHeader(const char* szBuffer)
     //HTTP协议版本
     string sVersion = TC_Common::upper(TC_Common::trim(sLine.substr(pos1+1)));
 
-    if(sVersion != "HTTP/1.1" || sVersion != "HTTP/1.0")
+    if(sVersion != "HTTP/1.1" && sVersion != "HTTP/1.0")
     {
         sVersion = "HTTP/1.1";
     }

@@ -35,6 +35,7 @@ import com.qq.tars.support.property.JvmPropertyPolicy.MemoryHeapUsedAvg;
 import com.qq.tars.support.property.JvmPropertyPolicy.ThreadNumAvg;
 import com.qq.tars.support.property.PropertyReportHelper;
 import com.qq.tars.support.property.PropertyReportHelper.Policy;
+import com.qq.tars.support.trace.TarsTraceZipkinConfiguration;
 
 public class OmServiceMngr {
 
@@ -46,10 +47,10 @@ public class OmServiceMngr {
 
     public void initAndStartOmService() {
         Communicator communicator = CommunicatorFactory.getInstance().getCommunicator();
-        String app = ConfigurationManager.getInstance().getserverConfig().getApplication();
-        String serverName = ConfigurationManager.getInstance().getserverConfig().getServerName();
-        String basePath = ConfigurationManager.getInstance().getserverConfig().getBasePath();
-        String modualName = ConfigurationManager.getInstance().getserverConfig().getCommunicatorConfig().getModuleName();
+        String app = ConfigurationManager.getInstance().getServerConfig().getApplication();
+        String serverName = ConfigurationManager.getInstance().getServerConfig().getServerName();
+        String basePath = ConfigurationManager.getInstance().getServerConfig().getBasePath();
+        String modualName = ConfigurationManager.getInstance().getServerConfig().getCommunicatorConfig().getModuleName();
 
         ConfigHelper.getInstance().setConfigInfo(communicator, app, serverName, basePath);
         NodeHelper.getInstance().setNodeInfo(communicator, app, serverName);
@@ -71,6 +72,7 @@ public class OmServiceMngr {
         }
 
         ServerStatHelper.getInstance().init(communicator);
+        TarsTraceZipkinConfiguration.getInstance().init();
         ScheduledServiceMngr.getInstance().start();
     }
 

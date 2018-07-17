@@ -34,14 +34,17 @@ public class Tars2JavaConfig {
     @Parameter(defaultValue = "", required = true)
     public String packagePrefixName;
 
-    @Parameter
-    public boolean forceArray;
+//    @Parameter
+//    public boolean forceArray;
 
     @Parameter
     public boolean checkDefault;
 
     @Parameter
     public boolean servant;
+
+    @Parameter
+    public boolean tup;
 
     public String getSrcPath() {
         return srcPath;
@@ -83,13 +86,13 @@ public class Tars2JavaConfig {
         this.packagePrefixName = packagePrefixName;
     }
 
-    public boolean isForceArray() {
-        return forceArray;
-    }
-
-    public void setForceArray(boolean forceArray) {
-        this.forceArray = forceArray;
-    }
+//    public boolean isForceArray() {
+//        return forceArray;
+//    }
+//
+//    public void setForceArray(boolean forceArray) {
+//        this.forceArray = forceArray;
+//    }
 
     public boolean isCheckDefault() {
         return checkDefault;
@@ -105,5 +108,13 @@ public class Tars2JavaConfig {
 
     public void setServant(boolean servant) {
         this.servant = servant;
+    }
+
+    public boolean isTup() {
+        return tup;
+    }
+
+    public void setTup(boolean tup) {
+        this.tup = tup;
     }
 }

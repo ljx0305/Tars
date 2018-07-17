@@ -15,7 +15,6 @@
  */
 
 #include "ExecuteTask.h"
-#include "util/tc_functor.h"
 #include "servant/Application.h"
 #include "util/tc_timeprovider.h"
 
@@ -337,10 +336,8 @@ void TaskListSerial::execute()
 {
     TLOGDEBUG("TaskListSerial::execute" << endl);
     
-    TC_Functor<void> cmd(this, &TaskListSerial::doTask);
-    TC_Functor<void>::wrapper_type fwrapper(cmd);
-
-    _pool.exec(fwrapper);
+    auto cmd = std::bind(&TaskListSerial::doTask, this);
+    _pool.exec(cmd);
 }
 
 void TaskListSerial::doTask()
@@ -383,7 +380,7 @@ TaskListParallel::TaskListParallel(const TaskReq &taskReq)
 : TaskList(taskReq)
 {
     //最大并行线程数
-    size_t num = taskReq.taskItemReq.size() < 20 ? 20 : taskReq.taskItemReq.size();
+    size_t num = taskReq.taskItemReq.size() > 10 ? 10 : taskReq.taskItemReq.size();
     _pool.init(num); 
     _pool.start();
 }
@@ -392,15 +389,12 @@ void TaskListParallel::execute()
 {
     TLOGDEBUG("TaskListParallel::execute" << endl);
     
-    TC_Functor<void, TL::TLMaker<TaskItemReq, size_t>::Result> cmd(this, &TaskListParallel::doTask);
-
     TC_LockT<TC_ThreadMutex> lock(*this);
 
     for (size_t i=0; i < _taskReq.taskItemReq.size(); i++)
     {
-        TC_Functor<void, TL::TLMaker<TaskItemReq, size_t>::Result>::wrapper_type fwrapper(cmd, _taskReq.taskItemReq[i], i);
-
-        _pool.exec(fwrapper);
+        auto cmd = std::bind(&TaskListParallel::doTask, this, _taskReq.taskItemReq[i], i);
+        _pool.exec(cmd);
     }
 }
 
@@ -424,12 +418,53 @@ void TaskListParallel::doTask(TaskItemReq req, size_t index)
 
 ExecuteTask::ExecuteTask()
 {
+    _terminate = false;
+    start();
 }
 
 ExecuteTask::~ExecuteTask()
 {
-    _terminate = true;
+    terminate();
 }
+
+void ExecuteTask::terminate()
+{
+    _terminate = true;
+    TC_LockT<TC_ThreadLock> lock(*this);
+    notifyAll();
+}
+
+void ExecuteTask::run()
+{
+    const time_t diff = 2*60;//2分钟
+    while (!_terminate)
+    {
+        {
+            TC_ThreadLock::Lock lock(*this);
+            map<string, TaskList* >::iterator it = _task.begin();
+            while (it != _task.end())
+            {
+                if(TC_TimeProvider::getInstance()->getNow() - it->second->getCreateTime() > diff)
+                {
+                    TLOGDEBUG("==============ExecuteTask::run, delete old task, taskNo=" << it->first << endl);
+                    TaskList *tmp = it->second;
+                    _task.erase(it++);
+                    delete tmp;
+                }
+                else
+                {
+                    ++it;
+                }
+            }
+        }
+
+        {
+            TC_LockT<TC_ThreadLock> lock(*this);
+            timedWait(5*1000);
+        }
+    }
+}
+
 
 int ExecuteTask::addTaskReq(const TaskReq &taskReq)
 {

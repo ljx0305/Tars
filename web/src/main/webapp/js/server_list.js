@@ -567,31 +567,29 @@ function addAdapter() {
                 showErrorMsg($box,'OBJ名和绑定地址为必填项!!!');
                 return;
             }
-            if(!/^[a-zA-Z]+$/.test($.trim($('#a-servant-name').val()))){
-                showErrorMsg($box,'OBJ名称必须为全英文');
-                return;
-            }
+ 
             if(!/^\d+$/g.test(paramObj.thread_num) || parseInt(paramObj.thread_num)<1){
                 showErrorMsg($box,'线程数必须为数字,且大于0');
                 return;
             }
             if(paramObj.endpoint){
                 var tmp = paramObj.endpoint.split(/\s-/);
-                var regProtocol = /^tcp|udp$/gi,
+                var regProtocol = /^tcp|udp|ssl$/gi,
                     regHost = /^h\s(\d{1,2}|1\d\d|2[0-4]\d|25[0-5])\.(\d{1,2}|1\d\d|2[0-4]\d|25[0-5])\.(\d{1,2}|1\d\d|2[0-4]\d|25[0-5])\.(\d{1,2}|1\d\d|2[0-4]\d|25[0-5])$/gi,
                     regT = /^t\s([1-9]|[1-9]\d+)$/gi,
                     regPort = /^p\s\d{4,5}$/,
+                    regAuth = /^e\s\d$/, // optional
                     check=true;
                 if(regProtocol.test(tmp[0])){
                     var flag = 0;
                     for(var i=1;i<tmp.length;i++){
-                        if(regHost.test(tmp[i]) || regT.test(tmp[i]) || regPort.test(tmp[i])){
+                        if(regHost.test(tmp[i]) || regT.test(tmp[i]) || regPort.test(tmp[i]) || regAuth.test(tmp[i])){
                             flag++;
                         }else{
                             flag--;
                         }
                     }
-                    if(flag==3){
+                    if(flag>=3){
                         for(var i=1;i<tmp.length;i++){
                             if(regPort.test(tmp[i])){
                                 var port = tmp[i].substring(2);
@@ -607,7 +605,7 @@ function addAdapter() {
                     check = false;
                 }
                 if(!check){
-                    showErrorMsg($box,'绑定地址填写错误!!!  <br>绑定地址格式：以tcp 或者 udp开头，有 -h -t -p 三个参数， -p 0-65535  -t 大于 0  -h ip格式');
+                    showErrorMsg($box,'绑定地址填写错误!!!  <br>绑定地址格式：以tcp 、ssl 或者 udp开头，有 -h -t -p 三个必选参数和-e可选参数， -p 0-65535  -t 大于 0  -h ip格式 -e 0-1');
                     return;
                 }
             }
@@ -687,31 +685,28 @@ function updateAdapter(id,tar,protocol,handlegroup,allowip) {
                 showErrorMsg($box,'OBJ名和绑定地址为必填项!!!');
                 return;
             }
-            if(!/^[a-zA-Z]+$/.test($.trim($('#a-servant-name').val()))){
-                showErrorMsg($box,'OBJ名称必须为全英文');
-                return;
-            }
             if(!/^\d+$/g.test(paramObj.thread_num) || parseInt(paramObj.thread_num)<1){
                 showErrorMsg($box,'线程数必须为数字,且大于0');
                 return;
             }
             if(paramObj.endpoint){
                 var tmp = paramObj.endpoint.split(/\s-/);
-                var regProtocol = /^tcp|udp$/gi,
+                var regProtocol = /^tcp|udp|ssl$/gi,
                     regHost = /^h\s(\d{1,2}|1\d\d|2[0-4]\d|25[0-5])\.(\d{1,2}|1\d\d|2[0-4]\d|25[0-5])\.(\d{1,2}|1\d\d|2[0-4]\d|25[0-5])\.(\d{1,2}|1\d\d|2[0-4]\d|25[0-5])$/gi,
                     regT = /^t\s([1-9]|[1-9]\d+)$/gi,
                     regPort = /^p\s\d{4,5}$/,
+                    regAuth = /^e\s\d$/, // optional
                     check=true;
                 if(regProtocol.test(tmp[0])){
                     var flag = 0;
                     for(var i=1;i<tmp.length;i++){
-                        if(regHost.test(tmp[i]) || regT.test(tmp[i]) || regPort.test(tmp[i])){
+                        if(regHost.test(tmp[i]) || regT.test(tmp[i]) || regPort.test(tmp[i]) || regAuth.test(tmp[i])){
                             flag++;
                         }else{
                             flag--;
                         }
                     }
-                    if(flag==3){
+                    if(flag>=3){
                         for(var i=1;i<tmp.length;i++){
                             if(regPort.test(tmp[i])){
                                 var port = tmp[i].substring(2);
@@ -727,7 +722,7 @@ function updateAdapter(id,tar,protocol,handlegroup,allowip) {
                     check = false;
                 }
                 if(!check){
-                    showErrorMsg($box,'绑定地址填写错误!!! <br>绑定地址格式：以tcp 或者 udp开头，有 -h -t -p 三个参数， -p 0-65535  -t 大于 0  -h ip格式');
+                    showErrorMsg($box,'绑定地址填写错误!!!  <br>绑定地址格式：以tcp 、ssl 或者 udp开头，有 -h -t -p 三个必选参数和-e可选参数， -p 0-65535  -t 大于 0  -h ip格式 -e 0-1');
                     return;
                 }
             }
